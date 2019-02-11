@@ -92,20 +92,6 @@ void __cdecl njColorBlendingMode__r(NJD_COLOR_TARGET target, NJD_COLOR_BLENDING 
 	}
 }
 
-//#define USE_QUEUED
-
-#ifdef USE_QUEUED
-static void __cdecl njDrawSprite2D_Queue_r(NJS_SPRITE* sp, Int n, Float pri, NJD_SPRITE attr, QueuedModelFlagsB queue_flags);
-static Trampoline njDrawSprite2D_Queue_t(0x00404660, 0x00404666, njDrawSprite2D_Queue_r);
-#endif
-
-static void __cdecl njDrawSprite2D_DrawNow_r(NJS_SPRITE* sp, Int n, Float pri, NJD_SPRITE attr);
-static Trampoline njDrawSprite2D_DrawNow_t(0x0077E050, 0x0077E058, njDrawSprite2D_DrawNow_r);
-static void __cdecl njDrawSprite2D_DrawNow_o(NJS_SPRITE* sp, Int n, Float pri, NJD_SPRITE attr)
-{
-	NonStaticFunctionPointer(void, original, (NJS_SPRITE*, Int, Float, NJD_SPRITE), njDrawSprite2D_DrawNow_t.Target());
-	original(sp, n, pri, attr);
-}
 
 void enqueue_sprite(NJS_SPRITE* sp, Int n, Float pri, NJD_SPRITE attr)
 {
@@ -117,7 +103,90 @@ void enqueue_sprite(NJS_SPRITE* sp, Int n, Float pri, NJD_SPRITE attr)
 	sprites.emplace_back(sp, n, pri, attr);
 }
 
+static void __cdecl njDrawSprite2D_DrawNow_r(NJS_SPRITE* sp, Int n, Float pri, NJD_SPRITE attr);
+static Trampoline njDrawSprite2D_DrawNow_t(0x0077E050, 0x0077E058, njDrawSprite2D_DrawNow_r);
+
+static void __cdecl njDrawSprite2D_DrawNow_o(NJS_SPRITE* sp, Int n, Float pri, NJD_SPRITE attr)
+{
+	NonStaticFunctionPointer(void, original, (NJS_SPRITE*, Int, Float, NJD_SPRITE), njDrawSprite2D_DrawNow_t.Target());
+	original(sp, n, pri, attr);
+}
+
+DataPointer(void*, Direct3D_Device, 0x03D128B0);
+
+static void reset_stream_source()
+{
+	// all to avoid linking with d3d8.lib
+	const auto value = Direct3D_Device;
+
+	__asm
+	{
+		mov eax, dword ptr [value]
+		mov edx, [eax]
+		push 0
+		push 0
+		push 0
+		push eax
+		call dword ptr [edx+0000014Ch]
+
+		mov eax, dword ptr[value]
+		mov ecx, [eax]
+		push 0
+		push 0
+		push eax
+		call dword ptr [ecx+00000154h]
+	}
+}
+
+static void __cdecl njDrawSprite2D_DrawNow_r(NJS_SPRITE* sp, Int n, Float pri, NJD_SPRITE attr)
+{
+	if (!sp || !sp->tlist)
+	{
+		return;
+	}
+
+	NJS_SPRITE _sp = *sp;
+	_sp.sx = 0.0f;
+	_sp.sy = 0.0f;
+
+	njDrawSprite2D_DrawNow_o(&_sp, n, pri, attr);
+
+	Direct3D_EnableHudAlpha((attr & NJD_SPRITE_ALPHA) == NJD_SPRITE_ALPHA);
+	enqueue_sprite(sp, n, pri, attr);
+	reset_stream_source();
+
+	Direct3D_SetTexList(sp->tlist);
+
+	NJS_COLOR color_, v16;
+
+	if (attr & NJD_SPRITE_COLOR)
+	{
+		color_.argb.b = (uint8_t)(_nj_constant_material_.b * 255.0f);
+		color_.argb.g = (uint8_t)(_nj_constant_material_.g * 255.0f);
+		color_.argb.r = (uint8_t)(_nj_constant_material_.r * 255.0f);
+		color_.argb.a = (uint8_t)(_nj_constant_material_.a * 255.0f);
+		v16.color     = color_.color;
+	}
+	else
+	{
+		v16.color = 0xFFFFFFFF;
+	}
+
+	Direct3D_EnableHudAlpha((attr & NJD_SPRITE_ALPHA) == NJD_SPRITE_ALPHA);
+
+	auto texid = sp->tanim[n].texid;
+
+	CurrentHUDColor = v16.color;
+	Direct3D_SetTextureNum(texid);
+	Direct3D_TextureFilterLinear();
+}
+
+//#define USE_QUEUED
+
 #ifdef USE_QUEUED
+static void __cdecl njDrawSprite2D_Queue_r(NJS_SPRITE* sp, Int n, Float pri, NJD_SPRITE attr, QueuedModelFlagsB queue_flags);
+static Trampoline njDrawSprite2D_Queue_t(0x00404660, 0x00404666, njDrawSprite2D_Queue_r);
+
 static void __cdecl njDrawSprite2D_Queue_r(NJS_SPRITE* sp, Int n, Float pri, NJD_SPRITE attr, QueuedModelFlagsB queue_flags)
 {
 	if (sp == nullptr)
@@ -130,11 +199,6 @@ static void __cdecl njDrawSprite2D_Queue_r(NJS_SPRITE* sp, Int n, Float pri, NJD
 	enqueue_sprite(sp, n, pri, attr);
 }
 #endif
-
-static void __cdecl njDrawSprite2D_DrawNow_r(NJS_SPRITE* sp, Int n, Float pri, NJD_SPRITE attr)
-{
-	enqueue_sprite(sp, n, pri, attr);
-}
 
 #define EXPORT __declspec(dllexport)
 
@@ -157,6 +221,9 @@ extern "C"
 	{
 		sprites.reserve(512);
 		texanims.reserve(128);
+
+		//WriteData<2>((void*)0x0077DF14, 0x90i8);
+		//WriteData<12>((void*)0x0077DF29, 0x90i8);
 	}
 
 	EXPORT void OnRenderSceneEnd()
@@ -165,14 +232,15 @@ extern "C"
 		//Direct3D_SetDefaultTextureStageState();
 
 		//Direct3D_SetNullTexture();
-		//Direct3D_EnableZWrite(false);
-		//Direct3D_SetZFunc(7);
+		Direct3D_EnableZWrite(false);
+		Direct3D_SetZFunc(7);
 
 		//njAlphaMode(2);
 		//njColorBlendingMode_(NJD_SOURCE_COLOR, NJD_COLOR_BLENDING_SRCALPHA);
 		//njColorBlendingMode_(NJD_DESTINATION_COLOR, NJD_COLOR_BLENDING_INVSRCALPHA);
 
-		auto nj_constant_material_ = _nj_constant_material_;
+		//auto hud_color = CurrentHUDColor;
+		//auto nj_constant_material_ = _nj_constant_material_;
 
 		njPushMatrix(nullptr);
 		for (auto& sprite : sprites)
@@ -182,7 +250,12 @@ extern "C"
 		}
 		njPopMatrix(1);
 
-		_nj_constant_material_ = nj_constant_material_;
+		//_nj_constant_material_ = nj_constant_material_;
+		//CurrentHUDColor = hud_color;
+		//Direct3D_EnableHudAlpha(false);
+
+		//njColorBlendingMode_(NJD_SOURCE_COLOR, NJD_COLOR_BLENDING_SRCALPHA);
+		//njColorBlendingMode_(NJD_DESTINATION_COLOR, NJD_COLOR_BLENDING_INVSRCALPHA);
 
 		sprites.clear();
 	}
