@@ -217,30 +217,62 @@ extern "C"
 		0
 	};
 
+	HMODULE sadx_d3d11 = nullptr;
+	void(*oit_enable_)() = nullptr;
+	void(*oit_disable_)() = nullptr;
+	bool(*oit_enabled_)() = nullptr;
+
 	EXPORT void Init()
 	{
 		sprites.reserve(512);
 		texanims.reserve(128);
 
+		sadx_d3d11 = GetModuleHandle(L"sadx-d3d11.dll");
+
+		if (sadx_d3d11 != INVALID_HANDLE_VALUE)
+		{
+			oit_enable_  = reinterpret_cast<decltype(oit_enable_)>(GetProcAddress(sadx_d3d11, "oit_enable"));
+			oit_disable_ = reinterpret_cast<decltype(oit_disable_)>(GetProcAddress(sadx_d3d11, "oit_disable"));
+			oit_enabled_ = reinterpret_cast<decltype(oit_enabled_)>(GetProcAddress(sadx_d3d11, "oit_enabled"));
+		}
+
 		//WriteData<2>((void*)0x0077DF14, 0x90i8);
 		//WriteData<12>((void*)0x0077DF29, 0x90i8);
 	}
 
+	void oit_enable()
+	{
+		if (oit_enable_)
+		{
+			oit_enable_();
+		}
+	}
+
+	void oit_disable()
+	{
+		if (oit_disable_)
+		{
+			oit_disable_();
+		}
+	}
+
+	bool oit_enabled()
+	{
+		if (oit_enabled_)
+		{
+			return oit_enabled_();
+		}
+
+		return false;
+	}
+
 	EXPORT void OnRenderSceneEnd()
 	{
-		//Direct3D_SetDefaultRenderState();
-		//Direct3D_SetDefaultTextureStageState();
+		const bool is_oit_enabled = oit_enabled();
+		oit_disable();
 
-		//Direct3D_SetNullTexture();
 		Direct3D_EnableZWrite(false);
 		Direct3D_SetZFunc(7);
-
-		//njAlphaMode(2);
-		//njColorBlendingMode_(NJD_SOURCE_COLOR, NJD_COLOR_BLENDING_SRCALPHA);
-		//njColorBlendingMode_(NJD_DESTINATION_COLOR, NJD_COLOR_BLENDING_INVSRCALPHA);
-
-		//auto hud_color = CurrentHUDColor;
-		//auto nj_constant_material_ = _nj_constant_material_;
 
 		njPushMatrix(nullptr);
 		for (auto& sprite : sprites)
@@ -250,13 +282,11 @@ extern "C"
 		}
 		njPopMatrix(1);
 
-		//_nj_constant_material_ = nj_constant_material_;
-		//CurrentHUDColor = hud_color;
-		//Direct3D_EnableHudAlpha(false);
-
-		//njColorBlendingMode_(NJD_SOURCE_COLOR, NJD_COLOR_BLENDING_SRCALPHA);
-		//njColorBlendingMode_(NJD_DESTINATION_COLOR, NJD_COLOR_BLENDING_INVSRCALPHA);
-
 		sprites.clear();
+
+		if (is_oit_enabled)
+		{
+			oit_enable();
+		}
 	}
 }
