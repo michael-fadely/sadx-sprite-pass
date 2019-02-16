@@ -236,8 +236,7 @@ extern "C"
 			oit_enabled_ = reinterpret_cast<decltype(oit_enabled_)>(GetProcAddress(sadx_d3d11, "oit_enabled"));
 		}
 
-		//WriteData<2>((void*)0x0077DF14, 0x90i8);
-		//WriteData<12>((void*)0x0077DF29, 0x90i8);
+		WriteData<5>((void*)0x0078B9E3, 0x90i8);
 	}
 
 	void oit_enable()
@@ -273,6 +272,8 @@ extern "C"
 
 		Direct3D_EnableZWrite(false);
 		Direct3D_SetZFunc(7);
+		njColorBlendingMode_(NJD_SOURCE_COLOR, NJD_COLOR_BLENDING_SRCALPHA);
+		njColorBlendingMode_(NJD_DESTINATION_COLOR, NJD_COLOR_BLENDING_INVSRCALPHA);
 
 		njPushMatrix(nullptr);
 		for (auto& sprite : sprites)
@@ -283,6 +284,12 @@ extern "C"
 		njPopMatrix(1);
 
 		sprites.clear();
+
+		Direct3D_EnableZWrite(false);
+		Direct3D_SetZFunc(7);
+		njColorBlendingMode_(NJD_SOURCE_COLOR, NJD_COLOR_BLENDING_SRCALPHA);
+		njColorBlendingMode_(NJD_DESTINATION_COLOR, NJD_COLOR_BLENDING_INVSRCALPHA);
+		ProbablyDrawDebugText(1);
 
 		if (is_oit_enabled)
 		{
