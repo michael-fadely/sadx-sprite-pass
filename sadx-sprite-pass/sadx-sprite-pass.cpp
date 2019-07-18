@@ -30,6 +30,7 @@ struct QueuedSprite
 	NJD_COLOR_BLENDING srcblend, dstblend;
 	NJS_MATRIX transform {};
 	NJS_ARGB nj_constant_material_ {};
+	bool fog = false;
 
 	QueuedSprite(const NJS_SPRITE* sp, Int n, Float pri, NJD_SPRITE attr)
 		: sp(*sp),
@@ -40,6 +41,8 @@ struct QueuedSprite
 		nj_constant_material_ = _nj_constant_material_;
 		srcblend = blending_modes[0];
 		dstblend = blending_modes[1];
+
+		fog = FogEnabled;
 
 		if (sp->tlist != nullptr)
 		{
@@ -66,6 +69,15 @@ struct QueuedSprite
 
 		njColorBlendingMode_(NJD_SOURCE_COLOR, srcblend);
 		njColorBlendingMode_(NJD_DESTINATION_COLOR, dstblend);
+
+		if (fog)
+		{
+			ToggleStageFog();
+		}
+		else
+		{
+			DisableFog();
+		}
 
 		if (n < 0)
 		{
@@ -290,6 +302,8 @@ void draw_sprites_3d()
 	njColorBlendingMode_(NJD_SOURCE_COLOR, NJD_COLOR_BLENDING_SRCALPHA);
 	njColorBlendingMode_(NJD_DESTINATION_COLOR, NJD_COLOR_BLENDING_INVSRCALPHA);
 
+	bool fog = FogEnabled;
+
 	njPushMatrix(nullptr);
 	for (auto& sprite : sprites_3d)
 	{
@@ -297,6 +311,15 @@ void draw_sprites_3d()
 		njDrawSprite3D_DrawNow_o(&sprite.sp, sprite.n, sprite.attr);
 	}
 	njPopMatrix(1);
+
+	if (fog)
+	{
+		ToggleStageFog();
+	}
+	else
+	{
+		DisableFog();
+	}
 
 	sprites_3d.clear();
 
