@@ -265,6 +265,8 @@ void draw_sprites_2d()
 	njColorBlendingMode_(NJD_SOURCE_COLOR, NJD_COLOR_BLENDING_SRCALPHA);
 	njColorBlendingMode_(NJD_DESTINATION_COLOR, NJD_COLOR_BLENDING_INVSRCALPHA);
 
+	bool fog = FogEnabled;
+
 	njPushMatrix(nullptr);
 	for (auto& sprite : sprites_2d)
 	{
@@ -272,6 +274,15 @@ void draw_sprites_2d()
 		njDrawSprite2D_DrawNow_o(&sprite.sp, sprite.n, sprite.pri, sprite.attr);
 	}
 	njPopMatrix(1);
+
+	if (fog)
+	{
+		ToggleStageFog();
+	}
+	else
+	{
+		DisableFog();
+	}
 
 	sprites_2d.clear();
 
